@@ -1,23 +1,24 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
-    <title>Boss Nim 2.9 - Ultimate Fix</title>
+    <meta charset="UTF-8">
+    <title>Boss Nim 2.9.1 - Ultimate Fix</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; background: #1a1a2e; color: #fff; margin: 0; padding: 20px; }
-        .row { margin: 10px; padding: 15px; background: #16213e; border-radius: 12px; border: 2px solid #0f3460; min-height: 50px; }
+        .row { margin: 10px auto; padding: 15px; background: #16213e; border-radius: 12px; border: 2px solid #0f3460; max-width: 600px; min-height: 60px; }
         .coin { width: 35px; height: 35px; background: radial-gradient(circle, #f1c40f, #f39c12); border-radius: 50%; display: inline-block; margin: 5px; border: 2px solid #d35400; cursor: pointer; transition: 0.2s; }
         .coin.selected { background: #ff4500 !important; border-color: #fff; transform: scale(1.1); box-shadow: 0 0 15px #ff4500; }
         .coin.bot-picking { background: #e74c3c !important; transform: scale(1.2); box-shadow: 0 0 15px #ff0000; }
-        #timer { font-size: 50px; font-weight: bold; color: #e74c3c; margin: 10px; }
-        #status { font-size: 22px; color: #4eeaff; margin-bottom: 15px; font-weight: bold; min-height: 32px; }
+        #timer { font-size: 60px; font-weight: bold; color: #e74c3c; margin: 10px; }
+        #status { font-size: 24px; color: #4eeaff; margin-bottom: 20px; font-weight: bold; min-height: 35px; }
         button { padding: 12px 25px; font-size: 16px; cursor: pointer; background: #34495e; color: white; border: none; border-radius: 8px; font-weight: bold; margin: 5px; }
         .btn-confirm { background: #2ecc71; } .btn-confirm:hover:not(:disabled) { background: #27ae60; }
         button:disabled { opacity: 0.1; cursor: not-allowed; }
     </style>
 </head>
 <body>
-    <h1>🎮 Boss Nim: Grandmaster v2.9</h1>
-    <div id="status">ระบบพร้อมแล้วค่ะ เจ้านาย!</div>
+    <h1>🎮 Boss Nim: Grandmaster v2.9.1</h1>
+    <div id="status">กำลังเตรียมสนามสอบบัญชี...</div>
     <div id="timer">15</div>
     <div id="game-board"></div>
     <div class="controls">
@@ -35,6 +36,8 @@
             const board = document.getElementById('game-board');
             board.innerHTML = '';
             
+            if (rows.length === 0) return;
+
             rows.forEach((count, rowIndex) => {
                 const rowDiv = document.createElement('div');
                 rowDiv.className = 'row';
@@ -44,11 +47,8 @@
                     const coin = document.createElement('div');
                     coin.className = 'coin';
                     
-                    // ปรับการเช็คเงื่อนไขให้เคลียร์ขึ้น
                     if (!isBotTurn) {
-                        // ถ้ายังไม่ได้เลือกแถวไหนเลย OR เลือกแถวนี้อยู่
                         if (selection.row === -1 || selection.row === rowIndex) {
-                            // ระบายสีเหรียญที่ถูกเลือก
                             if (selection.row === rowIndex && i >= count - selection.count) {
                                 coin.className += ' selected';
                             }
@@ -58,7 +58,6 @@
                     rowDiv.appendChild(coin);
                 }
 
-                // แสดงเหรียญแดงตอนบอทเดิน
                 if (rowIndex === botRow) {
                     for (let k = 0; k < botPick; k++) {
                         const bc = document.createElement('div');
@@ -75,7 +74,6 @@
             if (selection.row !== -1 && selection.row !== rowIndex) return;
 
             selection.row = rowIndex;
-            // คลิกเหรียญในแถวเดียวกันจะเพิ่มจำนวนไปเรื่อยๆ จนเต็มแล้ววนกลับมา 1
             selection.count = (selection.count < rows[rowIndex]) ? selection.count + 1 : 1;
             
             document.getElementById('confirm-btn').disabled = false;
@@ -91,7 +89,7 @@
         }
 
         function confirmMove() {
-            if (isBotTurn || selection.count === 0) return;
+            if (isBotTurn || selection.row === -1) return;
             
             rows[selection.row] -= selection.count;
             clearSelection();
@@ -100,8 +98,8 @@
             
             isBotTurn = true;
             clearInterval(timerInterval);
-            document.getElementById('status').innerText = "ดิฉัน (Grandmaster) กำลังแก้เกมค่ะ...";
-            render(); // วาดใหม่เพื่อล็อคการคลิก
+            document.getElementById('status').innerText = "ดิฉันกำลัง Audit แก้เกมค่ะ...";
+            render();
             setTimeout(computerMove, 1000);
         }
 
@@ -109,7 +107,6 @@
             let nimSum = rows.reduce((a, b) => a ^ b, 0);
             let rIdx = -1, pAmt = 0;
 
-            // --- GRANDMASTER LOGIC ---
             let rowsWithMoreThanOne = rows.filter(r => r > 1).length;
             if (rowsWithMoreThanOne <= 1) {
                 let remainingRows = rows.filter(r => r > 0).length;
@@ -127,14 +124,70 @@
                 pAmt = 1;
             }
 
-            rows[rIdx] -= pAmt;
-            render(rIdx, pAmt); // โชว์เหรียญแดง
-            await new Promise(r => setTimeout(r, 1200));
+            if (rIdx !== -1) {
+                rows[rIdx] -= pAmt;
+                render(rIdx, pAmt);
+                await new Promise(r => setTimeout(r, 1200));
+            }
             
-            isBotTurn = false; // คืนตาให้เจ้านายก่อน Render
-            render(); // ล้างเหรียญแดง และเปิด onclick
+            isBotTurn = false;
+            render();
             
             if (rows.every(r => r === 0)) return checkWin("ดิฉัน (Piphek)");
             
             timeLeft = 15;
-            document.getElementById
+            document.getElementById('status').innerText = "ตาเจ้านายแล้วค่ะ!";
+            startTimer();
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            document.getElementById('timer').innerText = timeLeft;
+            timerInterval = setInterval(() => {
+                if (!isBotTurn) {
+                    timeLeft--;
+                    document.getElementById('timer').innerText = timeLeft;
+                    if (timeLeft <= 0) {
+                        clearInterval(timerInterval);
+                        alert("⚠️ หมดเวลา! ดิฉันชนะค่ะ!");
+                        resetGame();
+                    }
+                }
+            }, 1000);
+        }
+
+        function checkWin(p) {
+            clearInterval(timerInterval);
+            setTimeout(() => { 
+                alert(`🏁 จบเกม! ${p === "เจ้านาย" ? "เจ้านาย" : "ดิฉัน"} หยิบเหรียญสุดท้าย... ${p} แพ้ค่ะ!`); 
+                resetGame(); 
+            }, 200);
+        }
+
+        function resetGame() {
+            clearInterval(timerInterval);
+            rows = Array.from({length: 5}, () => Math.floor(Math.random() * 5) + 1);
+            selection = { row: -1, count: 0 };
+            isBotTurn = false;
+            timeLeft = 15;
+            document.getElementById('confirm-btn').disabled = true;
+            document.getElementById('clear-btn').disabled = true;
+            
+            const first = Math.floor(Math.random() * 2);
+            if (first === 1) { 
+                isBotTurn = true; 
+                render();
+                document.getElementById('status').innerText = "ดิฉันเริ่มก่อนนะค่ะ!";
+                setTimeout(computerMove, 1000); 
+            } else { 
+                document.getElementById('status').innerText = "เจ้านายเริ่มก่อนค่ะ!"; 
+                render();
+                startTimer(); 
+            }
+        }
+
+        // เริ่มเกมทันทีที่โหลดหน้าจอ
+        window.onload = resetGame;
+    </script>
+</body>
+</html>
