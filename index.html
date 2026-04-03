@@ -1,92 +1,63 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Boss Nim 2.5 - Pro Edition</title>
+    <title>Boss Nim 2.6 - Master Auditor</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; background: #1a1a2e; color: #fff; margin: 0; padding: 20px; }
         .row { margin: 10px; padding: 15px; background: #16213e; border-radius: 12px; display: block; border: 2px solid #0f3460; min-height: 50px; }
         .coin { width: 35px; height: 35px; background: radial-gradient(circle, #f1c40f, #f39c12); border-radius: 50%; display: inline-block; margin: 5px; border: 2px solid #d35400; cursor: pointer; transition: 0.2s; }
-        .coin.selected { background: #ff4500 !important; border-color: #fff; transform: translateY(-5px); box-shadow: 0 5px 10px rgba(255,69,0,0.5); }
+        .coin.selected { background: #ff4500 !important; border-color: #fff; transform: scale(1.1); box-shadow: 0 0 15px #ff4500; }
         .coin.bot-picking { background: #e74c3c !important; transform: scale(1.2); box-shadow: 0 0 15px #ff0000; }
         #timer { font-size: 50px; font-weight: bold; color: #e74c3c; margin: 10px; }
         #status { font-size: 20px; color: #4eeaff; margin-bottom: 15px; font-weight: bold; min-height: 30px; }
-        button { padding: 12px 25px; font-size: 16px; cursor: pointer; background: #e94560; color: white; border: none; border-radius: 8px; font-weight: bold; margin: 5px; }
-        button:disabled { background: #444; opacity: 0.6; cursor: not-allowed; }
-        .btn-confirm { background: #2ecc71; } .btn-confirm:hover { background: #27ae60; }
-        .btn-pause { background: #f39c12; } .btn-pause:hover { background: #e67e22; }
+        button { padding: 12px 25px; font-size: 16px; cursor: pointer; background: #34495e; color: white; border: none; border-radius: 8px; font-weight: bold; margin: 5px; }
+        .btn-confirm { background: #2ecc71; } .btn-confirm:hover:not(:disabled) { background: #27ae60; }
+        .btn-pause { background: #f39c12; }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
     </style>
 </head>
 <body>
-    <h1>🎮 Boss Nim: Pro Auditor v2.5</h1>
-    <div id="status">กำลังเตรียมงบประมาณ...</div>
+    <h1>🎮 Boss Nim: Master v2.6</h1>
+    <div id="status">กำลังเตรียมกระดาน...</div>
     <div id="timer">15</div>
     <div id="game-board"></div>
     <div class="controls">
-        <button id="confirm-btn" class="btn-confirm" onclick="confirmUserMove()" disabled>ยืนยันการหยิบ (Confirm)</button>
+        <button id="confirm-btn" class="btn-confirm" onclick="confirmMove()" disabled>ยืนยันหมาก (Confirm)</button>
+        <button id="clear-btn" onclick="clearSelection()" disabled>ล้างการเลือก</button>
         <button id="pause-btn" class="btn-pause" onclick="togglePause()">หยุดชั่วคราว (Pause)</button>
         <button onclick="resetGame()">สุ่มกระดานใหม่</button>
     </div>
 
     <script>
         let rows = [];
-        let selectedRow = -1;
-        let selectedCount = 0;
-        let timeLeft = 15;
-        let timerInterval;
-        let isPaused = false;
-        let isBotTurn = false;
-
-        function startTimer() {
-            clearInterval(timerInterval);
-            if(isPaused) return;
-            document.getElementById('timer').innerText = timeLeft;
-            timerInterval = setInterval(() => {
-                if(!isPaused) {
-                    timeLeft--;
-                    document.getElementById('timer').innerText = timeLeft;
-                    if (timeLeft <= 0) {
-                        clearInterval(timerInterval);
-                        alert("⚠️ หมดเวลา! เจ้านายแพ้แล้วค่ะ!");
-                        resetGame();
-                    }
-                }
-            }, 1000);
-        }
-
-        function togglePause() {
-            isPaused = !isPaused;
-            document.getElementById('pause-btn').innerText = isPaused ? "เล่นต่อ (Resume)" : "หยุดชั่วคราว (Pause)";
-            document.getElementById('status').innerText = isPaused ? "⏸️ หยุดเกมชั่วคราวค่ะ..." : (isBotTurn ? "ดิฉันกำลังเดิน..." : "ตาเจ้านายเลือกเหรียญค่ะ");
-        }
+        let selection = { row: -1, count: 0 };
+        let timeLeft = 15, timerInterval, isPaused = false, isBotTurn = false;
 
         function render(botRow = -1, botPick = 0) {
             const board = document.getElementById('game-board');
             board.innerHTML = '';
-            rows.forEach((count, i) => {
+            rows.forEach((count, rowIndex) => {
                 const rowDiv = document.createElement('div');
                 rowDiv.className = 'row';
-                rowDiv.innerHTML = `แถว ${i+1}: `;
+                rowDiv.innerHTML = `แถว ${rowIndex + 1}: `;
                 
-                // วาดเหรียญที่ยังอยู่
-                for(let j=0; j<count; j++) {
+                for (let i = 0; i < count; i++) {
                     const coin = document.createElement('div');
                     coin.className = 'coin';
                     
-                    // ระบบเลือกหลายเหรียญในแถวเดียวกัน
-                    if (!isBotTurn && !isPaused) {
-                        if (selectedRow === -1 || selectedRow === i) {
-                            if (j >= count - selectedCount && i === selectedRow) {
-                                coin.className += ' selected';
-                            }
-                            coin.onclick = () => selectCoin(i);
+                    // Logic การเลือก: ถ้ายังไม่เลือกแถว หรือเลือกแถวนี้อยู่
+                    if (!isBotTurn && !isPaused && (selection.row === -1 || selection.row === rowIndex)) {
+                        // ถ้าเหรียญนี้อยู่ในจำนวนที่ถูกเลือก
+                        if (selection.row === rowIndex && i >= count - selection.count) {
+                            coin.className += ' selected';
                         }
+                        coin.onclick = () => handleSelect(rowIndex);
                     }
                     rowDiv.appendChild(coin);
                 }
 
-                // โชว์เหรียญแดงตอนบอทเดิน
-                if (i === botRow) {
-                    for(let k=0; k<botPick; k++) {
+                if (rowIndex === botRow) {
+                    for (let k = 0; k < botPick; k++) {
                         const bc = document.createElement('div');
                         bc.className = 'coin bot-picking';
                         rowDiv.appendChild(bc);
@@ -96,100 +67,92 @@
             });
         }
 
-        function selectCoin(rowIndex) {
-            if (isPaused || isBotTurn) return;
-            if (selectedRow !== -1 && selectedRow !== rowIndex) return;
-            
-            if (selectedRow === -1) selectedRow = rowIndex;
-            
-            if (selectedCount < rows[rowIndex]) {
-                selectedCount++;
+        function handleSelect(rowIndex) {
+            if (selection.row !== -1 && selection.row !== rowIndex) return;
+            selection.row = rowIndex;
+            if (selection.count < rows[rowIndex]) {
+                selection.count++;
             } else {
-                selectedCount = 0;
-                selectedRow = -1;
+                selection.count = 1; // วนกลับมาเริ่ม 1 ใหม่ในแถวเดิม
             }
-            
-            document.getElementById('confirm-btn').disabled = (selectedCount === 0);
+            document.getElementById('confirm-btn').disabled = false;
+            document.getElementById('clear-btn').disabled = false;
             render();
         }
 
-        function confirmUserMove() {
-            if (selectedCount > 0) {
-                rows[selectedRow] -= selectedCount;
-                selectedRow = -1;
-                selectedCount = 0;
-                document.getElementById('confirm-btn').disabled = true;
-                render();
-                
-                if (rows.every(r => r === 0)) {
-                    checkWin("เจ้านาย");
-                } else {
-                    isBotTurn = true;
-                    setTimeout(computerMove, 1000);
-                }
-            }
+        function clearSelection() {
+            selection = { row: -1, count: 0 };
+            document.getElementById('confirm-btn').disabled = true;
+            document.getElementById('clear-btn').disabled = true;
+            render();
+        }
+
+        function confirmMove() {
+            rows[selection.row] -= selection.count;
+            let lastPlayer = "เจ้านาย";
+            clearSelection();
+            if (rows.every(r => r === 0)) return checkWin(lastPlayer);
+            
+            isBotTurn = true;
+            document.getElementById('status').innerText = "ดิฉันกำลังคิดบัญชี...";
+            setTimeout(computerMove, 1000);
         }
 
         async function computerMove() {
-            isBotTurn = true;
-            clearInterval(timerInterval);
-            document.getElementById('status').innerText = "ดิฉันกำลังคิดบัญชี... ดูเหรียญแดงนะคะ";
-            
             let nimSum = rows.reduce((a, b) => a ^ b, 0);
             let rIdx = -1, pAmt = 0;
-
             if (nimSum > 0) {
                 for (let i = 0; i < rows.length; i++) {
                     let target = rows[i] ^ nimSum;
                     if (target < rows[i]) { rIdx = i; pAmt = rows[i] - target; break; }
                 }
             } else {
-                for (let i = 0; i < rows.length; i++) {
-                    if (rows[i] > 0) { rIdx = i; pAmt = 1; break; }
-                }
+                rIdx = rows.findIndex(r => r > 0);
+                pAmt = 1;
             }
-
             rows[rIdx] -= pAmt;
             render(rIdx, pAmt);
             await new Promise(r => setTimeout(r, 1200));
-            
             render();
-            if (rows.every(r => r === 0)) {
-                checkWin("ดิฉัน (Piphek)");
-            } else {
-                isBotTurn = false;
-                timeLeft = 15;
-                document.getElementById('status').innerText = "ตาเจ้านายแล้วค่ะ! (คลิกแถวที่ต้องการกี่ครั้งก็ได้)";
-                startTimer();
-            }
+            if (rows.every(r => r === 0)) return checkWin("ดิฉัน (Piphek)");
+            isBotTurn = false;
+            timeLeft = 15;
+            document.getElementById('status').innerText = "ตาเจ้านายแล้วค่ะ!";
+            startTimer();
         }
 
-        function checkWin(player) {
+        function startTimer() {
             clearInterval(timerInterval);
-            setTimeout(() => {
-                alert(`🎉 จบเกม! ${player} หยิบเหรียญสุดท้าย... ${player} แพ้ค่ะ!`);
-                resetGame();
-            }, 100);
+            timerInterval = setInterval(() => {
+                if (!isPaused) {
+                    timeLeft--;
+                    document.getElementById('timer').innerText = timeLeft;
+                    if (timeLeft <= 0) { clearInterval(timerInterval); alert("หมดเวลา! แพ้แล้วค่ะ"); resetGame(); }
+                }
+            }, 1000);
+        }
+
+        function togglePause() {
+            isPaused = !isPaused;
+            document.getElementById('pause-btn').innerText = isPaused ? "เล่นต่อ" : "หยุดชั่วคราว";
+            document.getElementById('status').innerText = isPaused ? "⏸️ พักเบรก..." : "ลุยต่อค่ะ!";
+        }
+
+        function checkWin(p) {
+            clearInterval(timerInterval);
+            setTimeout(() => { alert(`จบเกม! ${p} แพ้ค่ะ!`); resetGame(); }, 100);
         }
 
         function resetGame() {
             clearInterval(timerInterval);
             rows = Array.from({length: 5}, () => Math.floor(Math.random() * 5) + 1);
-            selectedRow = -1; selectedCount = 0; isPaused = false; isBotTurn = false;
-            timeLeft = 15;
-            document.getElementById('pause-btn').innerText = "หยุดชั่วคราว (Pause)";
-            document.getElementById('confirm-btn').disabled = true;
-            
+            selection = { row: -1, count: 0 };
+            isPaused = false; isBotTurn = false; timeLeft = 15;
+            document.getElementById('pause-btn').innerText = "หยุดชั่วคราว";
             const first = Math.floor(Math.random() * 2);
             render();
-            if (first === 1) {
-                isBotTurn = true;
-                document.getElementById('status').innerText = "ตานี้ดิฉันเริ่มก่อนนะค่ะ!";
-                setTimeout(computerMove, 1500);
-            } else {
-                document.getElementById('status').innerText = "เจ้านายเริ่มก่อนค่ะ!";
-                startTimer();
-            }
+            if (first === 1) { isBotTurn = true; setTimeout(computerMove, 1000); }
+            else { document.getElementById('status').innerText = "เจ้านายเริ่มก่อน!"; startTimer(); }
         }
         resetGame();
     </script>
