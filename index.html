@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Boss Nim 2.7 - Fixed Turn Logic</title>
+    <title>Boss Nim 2.9 - Ultimate Fix</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; background: #1a1a2e; color: #fff; margin: 0; padding: 20px; }
         .row { margin: 10px; padding: 15px; background: #16213e; border-radius: 12px; border: 2px solid #0f3460; min-height: 50px; }
@@ -12,42 +12,43 @@
         #status { font-size: 22px; color: #4eeaff; margin-bottom: 15px; font-weight: bold; min-height: 32px; }
         button { padding: 12px 25px; font-size: 16px; cursor: pointer; background: #34495e; color: white; border: none; border-radius: 8px; font-weight: bold; margin: 5px; }
         .btn-confirm { background: #2ecc71; } .btn-confirm:hover:not(:disabled) { background: #27ae60; }
-        .btn-pause { background: #f39c12; }
-        button:disabled { opacity: 0.2; cursor: not-allowed; }
+        button:disabled { opacity: 0.1; cursor: not-allowed; }
     </style>
 </head>
 <body>
-    <h1>🎮 Boss Nim: Fixed v2.7</h1>
-    <div id="status">กำลังเตรียมกระดาน...</div>
+    <h1>🎮 Boss Nim: Grandmaster v2.9</h1>
+    <div id="status">ระบบพร้อมแล้วค่ะ เจ้านาย!</div>
     <div id="timer">15</div>
     <div id="game-board"></div>
     <div class="controls">
         <button id="confirm-btn" class="btn-confirm" onclick="confirmMove()" disabled>ยืนยันหมาก (Confirm)</button>
         <button id="clear-btn" onclick="clearSelection()" disabled>ล้างการเลือก</button>
-        <button id="pause-btn" class="btn-pause" onclick="togglePause()">หยุดชั่วคราว (Pause)</button>
         <button onclick="resetGame()">สุ่มกระดานใหม่</button>
     </div>
 
     <script>
         let rows = [];
         let selection = { row: -1, count: 0 };
-        let timeLeft = 15, timerInterval, isPaused = false, isBotTurn = false;
+        let timeLeft = 15, timerInterval, isBotTurn = false;
 
         function render(botRow = -1, botPick = 0) {
             const board = document.getElementById('game-board');
             board.innerHTML = '';
+            
             rows.forEach((count, rowIndex) => {
                 const rowDiv = document.createElement('div');
                 rowDiv.className = 'row';
-                rowDiv.innerHTML = `แถว ${rowIndex + 1}: `;
+                rowDiv.innerHTML = `แถว ${rowIndex + 1} (${count}): `;
                 
                 for (let i = 0; i < count; i++) {
                     const coin = document.createElement('div');
                     coin.className = 'coin';
                     
-                    // ปลดล็อคให้เจ้านายกดได้ ถ้าไม่ใช่ตาดิฉันและไม่ได้หยุดเกม
-                    if (!isBotTurn && !isPaused) {
+                    // ปรับการเช็คเงื่อนไขให้เคลียร์ขึ้น
+                    if (!isBotTurn) {
+                        // ถ้ายังไม่ได้เลือกแถวไหนเลย OR เลือกแถวนี้อยู่
                         if (selection.row === -1 || selection.row === rowIndex) {
+                            // ระบายสีเหรียญที่ถูกเลือก
                             if (selection.row === rowIndex && i >= count - selection.count) {
                                 coin.className += ' selected';
                             }
@@ -57,6 +58,7 @@
                     rowDiv.appendChild(coin);
                 }
 
+                // แสดงเหรียญแดงตอนบอทเดิน
                 if (rowIndex === botRow) {
                     for (let k = 0; k < botPick; k++) {
                         const bc = document.createElement('div');
@@ -69,15 +71,13 @@
         }
 
         function handleSelect(rowIndex) {
-            if (isBotTurn || isPaused) return; // กันเหนียว
+            if (isBotTurn) return;
             if (selection.row !== -1 && selection.row !== rowIndex) return;
-            
+
             selection.row = rowIndex;
-            if (selection.count < rows[rowIndex]) {
-                selection.count++;
-            } else {
-                selection.count = 1; 
-            }
+            // คลิกเหรียญในแถวเดียวกันจะเพิ่มจำนวนไปเรื่อยๆ จนเต็มแล้ววนกลับมา 1
+            selection.count = (selection.count < rows[rowIndex]) ? selection.count + 1 : 1;
+            
             document.getElementById('confirm-btn').disabled = false;
             document.getElementById('clear-btn').disabled = false;
             render();
@@ -91,24 +91,33 @@
         }
 
         function confirmMove() {
-            if (isBotTurn || isPaused) return;
+            if (isBotTurn || selection.count === 0) return;
+            
             rows[selection.row] -= selection.count;
             clearSelection();
-            render();
-
+            
             if (rows.every(r => r === 0)) return checkWin("เจ้านาย");
             
-            // ส่งมอบงานให้บอท
-            isBotTurn = true; 
+            isBotTurn = true;
             clearInterval(timerInterval);
-            document.getElementById('status').innerText = "ดิฉันกำลังคิดบัญชี...";
+            document.getElementById('status').innerText = "ดิฉัน (Grandmaster) กำลังแก้เกมค่ะ...";
+            render(); // วาดใหม่เพื่อล็อคการคลิก
             setTimeout(computerMove, 1000);
         }
 
         async function computerMove() {
             let nimSum = rows.reduce((a, b) => a ^ b, 0);
             let rIdx = -1, pAmt = 0;
-            if (nimSum > 0) {
+
+            // --- GRANDMASTER LOGIC ---
+            let rowsWithMoreThanOne = rows.filter(r => r > 1).length;
+            if (rowsWithMoreThanOne <= 1) {
+                let remainingRows = rows.filter(r => r > 0).length;
+                let targetAmount = (remainingRows % 2 === 0) ? 1 : 0;
+                rIdx = rows.findIndex(r => r > 1);
+                if (rIdx === -1) rIdx = rows.findIndex(r => r > 0);
+                pAmt = rows[rIdx] - targetAmount;
+            } else if (nimSum > 0) {
                 for (let i = 0; i < rows.length; i++) {
                     let target = rows[i] ^ nimSum;
                     if (target < rows[i]) { rIdx = i; pAmt = rows[i] - target; break; }
@@ -117,69 +126,15 @@
                 rIdx = rows.findIndex(r => r > 0);
                 pAmt = 1;
             }
-            
+
             rows[rIdx] -= pAmt;
             render(rIdx, pAmt); // โชว์เหรียญแดง
             await new Promise(r => setTimeout(r, 1200));
             
-            render(); // ล้างเหรียญแดง
+            isBotTurn = false; // คืนตาให้เจ้านายก่อน Render
+            render(); // ล้างเหรียญแดง และเปิด onclick
             
             if (rows.every(r => r === 0)) return checkWin("ดิฉัน (Piphek)");
-
-            // --- หัวใจสำคัญ: คืนตาให้เจ้านาย ---
-            isBotTurn = false; 
-            timeLeft = 15;
-            document.getElementById('status').innerText = "ตาเจ้านายแล้วค่ะ!";
-            startTimer();
-            render(); // Render อีกรอบเพื่อให้เหรียญกลับมา onclick ได้
-        }
-
-        function startTimer() {
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                if (!isPaused && !isBotTurn) {
-                    timeLeft--;
-                    document.getElementById('timer').innerText = timeLeft;
-                    if (timeLeft <= 0) { clearInterval(timerInterval); alert("หมดเวลา! แพ้แล้วค่ะ"); resetGame(); }
-                }
-            }, 1000);
-        }
-
-        function togglePause() {
-            isPaused = !isPaused;
-            document.getElementById('pause-btn').innerText = isPaused ? "เล่นต่อ" : "หยุดชั่วคราว";
-            document.getElementById('status').innerText = isPaused ? "⏸️ พักเบรก..." : (isBotTurn ? "ดิฉันกำลังเดิน..." : "ลุยต่อค่ะ!");
-            render();
-        }
-
-        function checkWin(p) {
-            clearInterval(timerInterval);
-            setTimeout(() => { alert(`จบเกม! ${p} แพ้ค่ะ!`); resetGame(); }, 100);
-        }
-
-        function resetGame() {
-            clearInterval(timerInterval);
-            rows = Array.from({length: 5}, () => Math.floor(Math.random() * 5) + 1);
-            selection = { row: -1, count: 0 };
-            isPaused = false; isBotTurn = false; timeLeft = 15;
-            document.getElementById('pause-btn').innerText = "หยุดชั่วคราว";
-            document.getElementById('confirm-btn').disabled = true;
-            document.getElementById('clear-btn').disabled = true;
             
-            const first = Math.floor(Math.random() * 2);
-            if (first === 1) { 
-                isBotTurn = true; 
-                render();
-                document.getElementById('status').innerText = "ดิฉันเริ่มก่อนนะค่ะ!";
-                setTimeout(computerMove, 1500); 
-            } else { 
-                isBotTurn = false;
-                document.getElementById('status').innerText = "เจ้านายเริ่มก่อน!"; 
-                render();
-                startTimer(); 
-            }
-        }
-        resetGame();
-    </script>
-</body>
-</html>
+            timeLeft = 15;
+            document.getElementById
