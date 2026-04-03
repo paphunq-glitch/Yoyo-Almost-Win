@@ -2,7 +2,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Boss Nim 2.9.5 - Final Stable</title>
+    <title>Boss Nim 2.9.6 - Stable Final</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; text-align: center; background: #1a1a2e; color: #fff; margin: 0; padding: 20px; }
         .row { margin: 10px auto; padding: 15px; background: #16213e; border-radius: 12px; border: 2px solid #0f3460; max-width: 600px; min-height: 60px; }
@@ -18,8 +18,8 @@
     </style>
 </head>
 <body>
-    <h1>🎮 Boss Nim: Master v2.9.5</h1>
-    <div id="status">ตรวจสอบระบบเรียบร้อย พร้อมลุยค่ะ!</div>
+    <h1>🎮 Boss Nim: Master v2.9.6</h1>
+    <div id="status">ระบบเสถียรแล้วค่ะ เจ้านาย!</div>
     <div id="timer">15</div>
     <div id="game-board"></div>
     <div class="controls">
@@ -34,9 +34,12 @@
         let selection = { row: -1, count: 0 };
         let timeLeft = 15, timerInterval, isBotTurn = false, isPaused = false, isGameOver = false;
 
+        // ฟังก์ชันวาดกระดาน
         function render(botRow = -1, botPick = 0) {
             const board = document.getElementById('game-board');
+            if (!board) return; // ป้องกัน Error ถ้าหาบอร์ดไม่เจอ
             board.innerHTML = '';
+            
             rows.forEach((count, rowIndex) => {
                 const rowDiv = document.createElement('div');
                 rowDiv.className = 'row';
@@ -95,7 +98,7 @@
             if (rows.every(r => r === 0)) return checkWin("เจ้านาย");
             isBotTurn = true;
             clearInterval(timerInterval);
-            document.getElementById('status').innerText = "ดิฉันกำลังคำนวณบิต...";
+            document.getElementById('status').innerText = "ดิฉันกำลัง Audit งบ...";
             render();
             setTimeout(computerMove, 1000);
         }
@@ -105,3 +108,96 @@
             let nimSum = rows.reduce((a, b) => a ^ b, 0);
             let rIdx = -1, pAmt = 0;
             let heapsOverOne = rows.filter(r => r > 1).length;
+            
+            if (heapsOverOne <= 1) {
+                let totalHeaps = rows.filter(r => r > 0).length;
+                let heapIdx = rows.findIndex(r => r > 1);
+                if (heapIdx === -1) {
+                    rIdx = rows.findIndex(r => r > 0);
+                    pAmt = 1;
+                } else {
+                    let otherHeaps = totalHeaps - 1;
+                    pAmt = (otherHeaps % 2 === 0) ? rows[heapIdx] - 1 : rows[heapIdx];
+                    rIdx = heapIdx;
+                }
+            } else if (nimSum > 0) {
+                for (let i = 0; i < rows.length; i++) {
+                    let target = rows[i] ^ nimSum;
+                    if (target < rows[i]) { rIdx = i; pAmt = rows[i] - target; break; }
+                }
+            } else {
+                rIdx = rows.findIndex(r => r > 0);
+                pAmt = 1;
+            }
+
+            if (rIdx !== -1) {
+                rows[rIdx] -= pAmt;
+                render(rIdx, pAmt);
+                await new Promise(r => setTimeout(r, 1200));
+            }
+            
+            isBotTurn = false;
+            render();
+            if (rows.every(r => r === 0)) return checkWin("ดิฉัน (Piphek)");
+            timeLeft = 15;
+            document.getElementById('status').innerText = "ตาเจ้านายแล้วค่ะ!";
+            if (!isPaused) startTimer();
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            document.getElementById('timer').innerText = timeLeft;
+            timerInterval = setInterval(() => {
+                if (!isPaused && !isBotTurn && !isGameOver) {
+                    timeLeft--;
+                    document.getElementById('timer').innerText = timeLeft;
+                    if (timeLeft <= 0) { 
+                        clearInterval(timerInterval); 
+                        isGameOver = true;
+                        alert("⚠️ หมดเวลา! ดิฉันชนะค่ะ!"); 
+                        manualReset(); 
+                    }
+                }
+            }, 1000);
+        }
+
+        function checkWin(p) {
+            clearInterval(timerInterval);
+            isGameOver = true;
+            document.getElementById('status').innerText = "จบเกมแล้วค่ะ";
+            setTimeout(() => { 
+                alert(`🏁 จบเกม! ${p === "เจ้านาย" ? "เจ้านาย" : "ดิฉัน"} เป็นคนหยิบเหรียญสุดท้าย... ${p} แพ้ค่ะ!`); 
+                manualReset(); 
+            }, 200);
+        }
+
+        function manualReset() {
+            clearInterval(timerInterval);
+            rows = Array.from({length: 5}, () => Math.floor(Math.random() * 5) + 1);
+            selection = { row: -1, count: 0 };
+            isBotTurn = false; isPaused = false; isGameOver = false; timeLeft = 15;
+            document.getElementById('pause-btn').innerText = "หยุดชั่วคราว (Pause)";
+            document.getElementById('confirm-btn').disabled = true;
+            document.getElementById('clear-btn').disabled = true;
+            
+            render();
+            const first = Math.floor(Math.random() * 2);
+            if (first === 1) { 
+                isBotTurn = true; 
+                document.getElementById('status').innerText = "ดิฉันเริ่มก่อนนะค่ะ!"; 
+                setTimeout(computerMove, 1000); 
+            } else { 
+                document.getElementById('status').innerText = "เจ้านายเริ่มก่อน!"; 
+                startTimer(); 
+            }
+        }
+
+        // --- จุดสำคัญ: ตรวจสอบว่า HTML โหลดเสร็จก่อนค่อยเริ่มเกม ---
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', manualReset);
+        } else {
+            manualReset();
+        }
+    </script>
+</body>
+</html>
