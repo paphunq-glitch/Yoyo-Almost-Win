@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Boss Nim Game - Piphek Edition</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f0f4f8; }
+        .row { margin: 10px; padding: 10px; background: white; border-radius: 8px; display: inline-block; min-width: 200px; border: 1px solid #ddd; }
+        .coin { width: 30px; height: 30px; background: gold; border-radius: 50%; display: inline-block; margin: 5px; border: 2px solid #b8860b; cursor: pointer; }
+        .coin.selected { background: #ff4500; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #2c3e50; color: white; border: none; border-radius: 5px; }
+        #status { margin-top: 20px; font-weight: bold; color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <h1>🎮 Boss Nim Game (5 Rows)</h1>
+    <div id="game-board"></div>
+    <div id="status">ตาของเจ้านายค่ะ!</div>
+    <br>
+    <button onclick="computerMove()">ให้บอทเดิน (Piphek Move)</button>
+    <button onclick="resetGame()">เริ่มเกมใหม่</button>
+
+    <script>
+        let rows = [1, 2, 3, 4, 5]; // เจ้านายปรับเลขเริ่มต้นตรงนี้ได้เลยค่ะ
+
+        function render() {
+            const board = document.getElementById('game-board');
+            board.innerHTML = '';
+            rows.forEach((count, i) => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'row';
+                rowDiv.innerHTML = `แถว ${i+1}: `;
+                for(let j=0; j<count; j++) {
+                    const coin = document.createElement('div');
+                    coin.className = 'coin';
+                    coin.onclick = () => { 
+                        rows[i]--; // เจ้านายคลิกหยิบออกทีละเหรียญ
+                        render();
+                        checkWin();
+                    };
+                    rowDiv.appendChild(coin);
+                }
+                board.appendChild(rowDiv);
+            });
+        }
+
+        function computerMove() {
+            // นี่คือสมองกล (Algorithm) ที่ดิฉันใช้สู้กับเจ้านายค่ะ!
+            let nimSum = rows.reduce((a, b) => a ^ b, 0);
+            if (nimSum > 0) {
+                for (let i = 0; i < rows.length; i++) {
+                    let target = rows[i] ^ nimSum;
+                    if (target < rows[i]) {
+                        rows[i] = target;
+                        break;
+                    }
+                }
+            } else {
+                // ถ้าสู้ไม่ได้ (Nim Sum = 0) บอทจะแกล้งสุ่มหยิบค่ะ
+                for (let i = 0; i < rows.length; i++) {
+                    if (rows[i] > 0) { rows[i]--; break; }
+                }
+            }
+            render();
+            checkWin();
+        }
+
+        function checkWin() {
+            if (rows.every(r => r === 0)) {
+                alert("เกมจบแล้วค่ะ! (ใครหยิบคนสุดท้ายแพ้ อย่าลืมกติกานะคะ!)");
+            }
+        }
+
+        function resetGame() { rows = [1, 2, 3, 4, 5]; render(); }
+        render();
+    </script>
+</body>
+</html>
